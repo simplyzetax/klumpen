@@ -1,9 +1,13 @@
 import { existsSync, readFileSync, readdirSync, unlinkSync, statSync, writeFileSync, mkdirSync } from "fs"
 import { join, resolve, basename } from "path"
-import { execSync } from "child_process"
+import { exec } from "child_process"
+import { promisify } from "util"
 import type { BundlerPlugin } from "./plugin.ts"
 import type { DetectedTarget, BundleResult, ModuleInfo } from "../types.ts"
 import { groupModulesByPackage } from "../analysis/analyze.ts"
+
+const execAsync = promisify(exec)
+const BUILD_TIMEOUT = 120_000 // vite builds can be slower
 
 export const vitePlugin: BundlerPlugin = {
   name: "vite",
@@ -103,9 +107,9 @@ export default mergeConfig(typeof baseConfig === "function" ? baseConfig({ mode:
     const viteBin = findViteBin(cwd)
 
     try {
-      execSync(
+      await execAsync(
         `${viteBin} build --config ${basename(wrapperConfig)} --mode production`,
-        { stdio: "pipe", cwd },
+        { cwd, timeout: BUILD_TIMEOUT },
       )
     } catch {
       // Build may fail but stats might still have been written

@@ -46,6 +46,9 @@ export function App({ targets, plugins }: AppProps) {
           prev.map((b, j) => (j === i ? { ...b, status: "running" as const } : b)),
         )
 
+        // Yield to let React render the "running" state before the build starts
+        await new Promise((r) => setTimeout(r, 10))
+
         const plugin = plugins.find((p) => p.name === target.bundler)
         if (!plugin) {
           setBuilds((prev) =>

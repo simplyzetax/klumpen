@@ -1,9 +1,13 @@
 import { existsSync, readFileSync, readdirSync, unlinkSync, statSync } from "fs"
 import { join, resolve, basename } from "path"
-import { execSync } from "child_process"
+import { exec } from "child_process"
+import { promisify } from "util"
 import type { BundlerPlugin } from "./plugin.ts"
 import type { DetectedTarget, BundleResult, ModuleInfo } from "../types.ts"
 import { groupModulesByPackage, buildImportGraph } from "../analysis/analyze.ts"
+
+const execAsync = promisify(exec)
+const BUILD_TIMEOUT = 60_000
 
 export const esbuildPlugin: BundlerPlugin = {
   name: "esbuild",
@@ -99,10 +103,10 @@ export const esbuildPlugin: BundlerPlugin = {
     ]
 
     try {
-      execSync(cmdParts.join(" "), { stdio: "pipe", cwd })
+      await execAsync(cmdParts.join(" "), { cwd, timeout: BUILD_TIMEOUT, maxBuffer: 50 * 1024 * 1024 })
     } catch {
       const fallbackParts = cmdParts.filter((p) => !p.startsWith("--tsconfig"))
-      execSync(fallbackParts.join(" "), { stdio: "pipe", cwd })
+      await execAsync(fallbackParts.join(" "), { cwd, timeout: BUILD_TIMEOUT })
     }
 
     const meta = JSON.parse(readFileSync(metafile, "utf-8"))

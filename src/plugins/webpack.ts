@@ -1,9 +1,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "fs"
 import { join, resolve, basename } from "path"
-import { execSync } from "child_process"
+import { exec } from "child_process"
+import { promisify } from "util"
 import type { BundlerPlugin } from "./plugin.ts"
 import type { DetectedTarget, BundleResult, ModuleInfo } from "../types.ts"
 import { groupModulesByPackage } from "../analysis/analyze.ts"
+
+const execAsync = promisify(exec)
+const BUILD_TIMEOUT = 120_000
 
 export const webpackPlugin: BundlerPlugin = {
   name: "webpack",
@@ -77,15 +81,16 @@ export const webpackPlugin: BundlerPlugin = {
 
     let statsJson: any
     try {
-      const output = execSync(`${webpackBin} --json`, {
-        stdio: "pipe",
+      const { stdout } = await execAsync(`${webpackBin} --json`, {
         cwd,
+        timeout: BUILD_TIMEOUT,
         env: { ...process.env, NODE_ENV: "production" },
-      }).toString()
+        maxBuffer: 50 * 1024 * 1024,
+      })
 
-      statsJson = JSON.parse(output)
+      statsJson = JSON.parse(stdout)
     } catch (e: any) {
-      const output = e.stdout?.toString() ?? ""
+      const output = e.stdout ?? ""
       try {
         statsJson = JSON.parse(output)
       } catch {
