@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, unlinkSync, statSync } from "fs"
+import { existsSync, readFileSync, readdirSync, unlinkSync, statSync, writeFileSync, mkdirSync } from "fs"
 import { join, resolve, basename } from "path"
 import { execSync } from "child_process"
 import type { BundlerPlugin } from "./plugin.ts"
@@ -49,29 +49,85 @@ export const vitePlugin: BundlerPlugin = {
 
   async analyze(target: DetectedTarget): Promise<BundleResult> {
     const cwd = resolve(target.configPath, "..")
-    const statsFile = join(cwd, `.klumpen-stats-${Date.now()}.json`)
+    const timestamp = Date.now()
+    const statsFile = join(cwd, `.klumpen-stats-${timestamp}.json`)
+
+    // Inject a Rollup plugin via a wrapper vite config that captures module info
+    const wrapperConfig = join(cwd, `.klumpen-vite-config-${timestamp}.ts`)
+    const originalConfig = target.configPath
+
+    writeFileSync(wrapperConfig, `
+import { defineConfig, mergeConfig } from "vite"
+import baseConfigModule from "./${basename(originalConfig)}"
+import { writeFileSync } from "fs"
+
+// Handle both default exports and named exports
+const baseConfig = baseConfigModule.default ?? baseConfigModule
+
+const klumpenPlugin = {
+  name: "klumpen-stats",
+  generateBundle(_options: any, bundle: any) {
+    const stats: any = { chunks: [] }
+
+    for (const [fileName, chunk] of Object.entries(bundle) as any) {
+      if (chunk.type !== "chunk") continue
+
+      const modules: any[] = []
+      for (const [modId, modInfo] of Object.entries(chunk.modules) as any) {
+        if (modId.startsWith("\\0")) continue
+        modules.push({
+          id: modId,
+          renderedLength: modInfo.renderedLength,
+          originalLength: modInfo.originalLength,
+        })
+      }
+
+      stats.chunks.push({
+        fileName,
+        code: chunk.code?.length ?? 0,
+        modules,
+        imports: chunk.imports ?? [],
+        dynamicImports: chunk.dynamicImports ?? [],
+      })
+    }
+
+    writeFileSync(${JSON.stringify(statsFile)}, JSON.stringify(stats))
+  },
+}
+
+export default mergeConfig(typeof baseConfig === "function" ? baseConfig({ mode: "production", command: "build" }) : (baseConfig ?? {}), defineConfig({
+  plugins: [klumpenPlugin],
+}))
+`)
 
     const viteBin = findViteBin(cwd)
 
     try {
       execSync(
-        `${viteBin} build --mode production 2>&1`,
-        {
-          stdio: "pipe",
-          cwd,
-          env: {
-            ...process.env,
-            KLUMPEN_STATS_FILE: statsFile,
-          },
-        },
+        `${viteBin} build --config ${basename(wrapperConfig)} --mode production`,
+        { stdio: "pipe", cwd },
       )
-    } catch {}
+    } catch {
+      // Build may fail but stats might still have been written
+    }
 
-    const result = parseViteBuildOutput(cwd, target.name)
+    // Cleanup wrapper config
+    try { unlinkSync(wrapperConfig) } catch {}
 
-    try { unlinkSync(statsFile) } catch {}
+    // Parse the stats
+    if (existsSync(statsFile)) {
+      try {
+        const stats = JSON.parse(readFileSync(statsFile, "utf-8"))
+        const result = parseChunkStats(stats, target.name, cwd)
+        unlinkSync(statsFile)
+        return result
+      } catch {
+        try { unlinkSync(statsFile) } catch {}
+      }
+    }
 
-    return result
+    // Fallback: scan dist/ output files (less useful but better than nothing)
+    return fallbackDistScan(cwd, target.name)
   },
 }
 
@@ -89,13 +145,76 @@ function findViteBin(cwd: string): string {
   return "vite"
 }
 
-function parseViteBuildOutput(cwd: string, targetName: string): BundleResult {
+function parseChunkStats(stats: any, targetName: string, cwd: string): BundleResult {
+  const modules: ModuleInfo[] = []
+  const edges: Record<string, string[]> = {}
+  let outputBytes = 0
+
+  for (const chunk of stats.chunks ?? []) {
+    outputBytes += chunk.code ?? 0
+
+    for (const mod of chunk.modules ?? []) {
+      // Normalize the module path relative to cwd
+      let modPath = mod.id ?? "unknown"
+
+      // Strip Vite's query params (?v=xxx, ?used, etc.)
+      modPath = modPath.replace(/\?.*$/, "")
+
+      // Make path relative
+      if (modPath.startsWith(cwd)) {
+        modPath = modPath.slice(cwd.length + 1)
+      }
+      // Handle /absolute/path/to/node_modules/...
+      if (modPath.startsWith("/") && modPath.includes("node_modules/")) {
+        modPath = modPath.slice(modPath.indexOf("node_modules/"))
+      }
+
+      modules.push({
+        path: modPath,
+        bytes: mod.renderedLength ?? mod.originalLength ?? 0,
+        isNodeModule: modPath.includes("node_modules/"),
+      })
+    }
+
+    // Build import graph from chunk imports
+    for (const imp of chunk.imports ?? []) {
+      if (!edges[imp]) edges[imp] = []
+      edges[imp]!.push(chunk.fileName)
+    }
+  }
+
+  // Deduplicate modules (same module can appear in multiple chunks)
+  const deduped = new Map<string, ModuleInfo>()
+  for (const mod of modules) {
+    const existing = deduped.get(mod.path)
+    if (!existing || mod.bytes > existing.bytes) {
+      deduped.set(mod.path, mod)
+    }
+  }
+  const uniqueModules = Array.from(deduped.values()).sort((a, b) => b.bytes - a.bytes)
+
+  const inputBytes = uniqueModules.reduce((sum, m) => sum + m.bytes, 0)
+
+  return {
+    target: targetName,
+    bundler: "vite",
+    outputBytes,
+    inputBytes,
+    modules: uniqueModules,
+    packages: groupModulesByPackage(uniqueModules),
+    importGraph: { edges },
+  }
+}
+
+function fallbackDistScan(cwd: string, targetName: string): BundleResult {
   const distDir = join(cwd, "dist")
   const modules: ModuleInfo[] = []
   let outputBytes = 0
 
   if (existsSync(distDir)) {
     walkDir(distDir, (filePath, relativePath) => {
+      // Skip non-code files for cleaner results
+      if (!/\.(js|mjs|css)$/.test(relativePath)) return
       try {
         const stat = statSync(filePath)
         outputBytes += stat.size
@@ -108,46 +227,11 @@ function parseViteBuildOutput(cwd: string, targetName: string): BundleResult {
     })
   }
 
-  // Try to read Rollup stats if available
-  const statsPath = join(cwd, "stats.json")
-  if (existsSync(statsPath)) {
-    try {
-      const stats = JSON.parse(readFileSync(statsPath, "utf-8"))
-      return parseRollupStats(stats, targetName)
-    } catch {}
-  }
-
   return {
     target: targetName,
     bundler: "vite",
     outputBytes,
     inputBytes: outputBytes,
-    modules: modules.sort((a, b) => b.bytes - a.bytes),
-    packages: groupModulesByPackage(modules),
-    importGraph: { edges: {} },
-  }
-}
-
-function parseRollupStats(stats: any, targetName: string): BundleResult {
-  const modules: ModuleInfo[] = []
-
-  if (stats.modules) {
-    for (const mod of stats.modules) {
-      modules.push({
-        path: mod.id ?? mod.name ?? "unknown",
-        bytes: mod.renderedLength ?? mod.size ?? 0,
-        isNodeModule: (mod.id ?? "").includes("node_modules/"),
-      })
-    }
-  }
-
-  const inputBytes = modules.reduce((sum, m) => sum + m.bytes, 0)
-
-  return {
-    target: targetName,
-    bundler: "vite",
-    outputBytes: inputBytes,
-    inputBytes,
     modules: modules.sort((a, b) => b.bytes - a.bytes),
     packages: groupModulesByPackage(modules),
     importGraph: { edges: {} },
