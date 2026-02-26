@@ -5,10 +5,11 @@ import { detectTargets } from "./detect.ts"
 import { esbuildPlugin } from "./plugins/esbuild.ts"
 import { vitePlugin } from "./plugins/vite.ts"
 import { webpackPlugin } from "./plugins/webpack.ts"
+import { wranglerPlugin } from "./plugins/wrangler.ts"
 import type { BundlerPlugin } from "./plugins/plugin.ts"
 import { formatBytes, formatPct } from "./analysis/analyze.ts"
 
-const plugins: BundlerPlugin[] = [esbuildPlugin, vitePlugin, webpackPlugin]
+const plugins: BundlerPlugin[] = [wranglerPlugin, esbuildPlugin, vitePlugin, webpackPlugin]
 
 // CLI args
 const args = process.argv.slice(2)
