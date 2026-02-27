@@ -57,12 +57,23 @@ interface GridCell {
   color: string
 }
 
+function fillColor(category: "npm" | "workspace" | "local"): string {
+  if (category === "workspace") return C.accent   // #ffffff
+  if (category === "local") return C.success       // #73c936
+  return "#888888"                                  // lighter grey — readable on black bg
+}
+
+function labelColor(category: "npm" | "workspace" | "local"): string {
+  return category === "npm" ? "#000000" : "#000000"
+}
+
 function renderCanvas(
   tiles: Tile[],
   selected: number,
   w: number,
   h: number,
 ): GridCell[][] {
+  // Default background: dark char so it's clearly a gap between tiles
   const grid: GridCell[][] = Array.from({ length: h }, () =>
     Array.from({ length: w }, () => ({ char: " ", color: C.dim })),
   )
@@ -72,82 +83,65 @@ function renderCanvas(
   for (let ti = 0; ti < tiles.length; ti++) {
     const tile = tiles[ti]!
     const isSelected = ti === selected
-    const baseColor = isSelected
-      ? C.text
-      : tile.category === "workspace"
-        ? C.accent
-        : tile.category === "local"
-          ? C.success
-          : C.dim
 
-    // Fill tile with block chars
-    for (let row = tile.y; row < tile.y + tile.h && row < h; row++) {
-      for (let col = tile.x; col < tile.x + tile.w && col < w; col++) {
-        const gridRow = grid[row]
-        if (gridRow) {
-          gridRow[col] = { char: "\u2588", color: baseColor }
-        }
+    const fc = fillColor(tile.category)
+    // Leave 1-char gap on right and bottom — creates visible tile separation
+    const fillW = Math.max(1, tile.w - 1)
+    const fillH = Math.max(1, tile.h - 1)
+
+    // Fill tile body
+    // Selected tiles use ▓ (75% shade) — visually lighter than the solid █ of
+    // unselected tiles, giving a clear "active" look regardless of category color.
+    const fillChar = isSelected ? "\u2593" : "\u2588" // ▓ vs █
+
+    for (let row = tile.y; row < tile.y + fillH && row < h; row++) {
+      for (let col = tile.x; col < tile.x + fillW && col < w; col++) {
+        grid[row]![col] = { char: fillChar, color: fc }
       }
     }
 
-    // Draw label if tile is large enough
-    if (tile.w >= 8 && tile.h >= 2) {
-      const labelColor =
-        isSelected
-          ? "#000000"
-          : tile.category === "npm"
-            ? C.text
-            : "#000000"
-      const name =
-        tile.name.length > tile.w - 2
-          ? tile.name.slice(0, tile.w - 3) + "\u2026"
-          : tile.name
+    // Label — only when tile has enough room
+    if (fillW >= 6 && fillH >= 2) {
+      const lc = labelColor(tile.category)
+      const prefix = isSelected ? "▶ " : ""
+      const maxNameLen = Math.max(1, fillW - 2 - prefix.length)
+      let name = tile.name
+      if (name.length > maxNameLen) name = name.slice(0, maxNameLen - 1) + "\u2026"
+      const displayName = prefix + name
+
       const size = formatBytes(tile.bytes)
       const pct = formatPct(tile.bytes, totalBytes)
       const line2 = `${size} ${pct}`
 
-      // Center name on middle row
+      // Vertically center — if 3+ rows, put name one row above center
       const midRow =
-        Math.floor(tile.y + tile.h / 2) - (tile.h >= 3 ? 1 : 0)
-      const nameStart = Math.max(
-        tile.x,
-        tile.x + Math.floor((tile.w - name.length) / 2),
-      )
+        Math.floor(tile.y + fillH / 2) - (fillH >= 3 ? 1 : 0)
+      const nameCol =
+        tile.x + Math.max(1, Math.floor((fillW - displayName.length) / 2))
+
       const midRowArr = grid[midRow]
       if (midRowArr) {
         for (
           let ci = 0;
-          ci < name.length && nameStart + ci < tile.x + tile.w;
+          ci < displayName.length && nameCol + ci < tile.x + fillW - 1;
           ci++
         ) {
-          const cell = midRowArr[nameStart + ci]
-          if (cell) {
-            midRowArr[nameStart + ci] = { char: name[ci]!, color: labelColor }
-          }
+          midRowArr[nameCol + ci] = { char: displayName[ci]!, color: lc }
         }
       }
 
-      // Size on next row if tall enough
-      if (tile.h >= 3) {
+      if (fillH >= 3) {
         const sizeRow = midRow + 1
-        const sizeStart = Math.max(
-          tile.x,
-          tile.x + Math.floor((tile.w - line2.length) / 2),
-        )
+        const sizeCol =
+          tile.x + Math.max(1, Math.floor((fillW - line2.length) / 2))
         const sizeRowArr = grid[sizeRow]
         if (sizeRowArr) {
           for (
             let ci = 0;
-            ci < line2.length && sizeStart + ci < tile.x + tile.w;
+            ci < line2.length && sizeCol + ci < tile.x + fillW - 1;
             ci++
           ) {
-            const cell = sizeRowArr[sizeStart + ci]
-            if (cell) {
-              sizeRowArr[sizeStart + ci] = {
-                char: line2[ci]!,
-                color: labelColor,
-              }
-            }
+            sizeRowArr[sizeCol + ci] = { char: line2[ci]!, color: lc }
           }
         }
       }
@@ -161,10 +155,11 @@ export function Treemap({ result, onTabSwitch }: TreemapProps) {
   const [selected, setSelected] = useState(0)
   const [zoomedPkg, setZoomedPkg] = useState<PackageGroup | null>(null)
 
+  // Read terminal dimensions at render time
   const COLS = process.stdout.columns ?? 80
   const ROWS = process.stdout.rows ?? 24
-  // Reserve rows: 4 for header+tabs above, 2 for hints below
-  const canvasH = Math.max(4, ROWS - 6)
+  // Reserve: ~3 rows for App header+tabs above, 1 title row, 1 gap, 1 hint row
+  const canvasH = Math.max(4, ROWS - 7)
   const canvasW = Math.max(20, COLS - 4)
 
   const tiles = useMemo(() => {
@@ -201,10 +196,14 @@ export function Treemap({ result, onTabSwitch }: TreemapProps) {
       case "enter":
       case "return":
         if (!zoomedPkg) {
-          const pkg = result.packages[selected]
-          if (pkg) {
-            setZoomedPkg(pkg)
-            setSelected(0)
+          // Find package by name — tiles are sorted differently than result.packages
+          const tile = tiles[selected]
+          if (tile) {
+            const pkg = result.packages.find((p) => p.name === tile.name)
+            if (pkg) {
+              setZoomedPkg(pkg)
+              setSelected(0)
+            }
           }
         }
         break
@@ -229,23 +228,34 @@ export function Treemap({ result, onTabSwitch }: TreemapProps) {
 
   return (
     <box flexDirection="column">
-      {/* Title line */}
-      <box marginBottom={1}>
-        {zoomedPkg ? (
-          <text fg={C.text}>
-            {zoomedPkg.name} <span fg={C.dim}>— files</span>
-          </text>
-        ) : (
-          <text fg={C.dim}>{result.packages.length} packages</text>
+      {/* Status line: selected tile info + zoom context */}
+      <box marginBottom={1} flexDirection="row">
+        {zoomedPkg && (
+          <>
+            <text fg={C.dim}>{zoomedPkg.name}</text>
+            <text fg={C.dim}>{" › "}</text>
+          </>
         )}
-        {selTile && (
-          <text fg={C.dim}>{`  ${selTile.name}  ${formatBytes(selTile.bytes)}`}</text>
+        {selTile ? (
+          <>
+            <text fg={C.text}>{selTile.name}</text>
+            <text fg={C.dim}>
+              {"  "}
+              {formatBytes(selTile.bytes)}
+              {"  "}
+              {formatPct(selTile.bytes, result.inputBytes)}
+            </text>
+          </>
+        ) : (
+          <text fg={C.dim}>—</text>
+        )}
+        {zoomedPkg && (
+          <text fg={C.dim}>{"  esc to zoom out"}</text>
         )}
       </box>
 
-      {/* Canvas rows */}
+      {/* Canvas */}
       {grid.map((row, rowIdx) => {
-        // Compress consecutive same-color chars into segments
         const segments: { chars: string; color: string }[] = []
         for (const cell of row) {
           const last = segments[segments.length - 1]
@@ -265,30 +275,6 @@ export function Treemap({ result, onTabSwitch }: TreemapProps) {
           </text>
         )
       })}
-
-      {/* Hints */}
-      <box marginTop={1}>
-        <text>
-          <span fg={C.accent}>{"↑↓←→"}</span>
-          <span fg={C.dim}>{" navigate "}</span>
-          <span fg={C.dim}>{" · "}</span>
-          <span fg={C.accent}>{"enter"}</span>
-          <span fg={C.dim}>{" zoom in "}</span>
-          {zoomedPkg && (
-            <>
-              <span fg={C.dim}>{" · "}</span>
-              <span fg={C.accent}>{"esc"}</span>
-              <span fg={C.dim}>{" zoom out "}</span>
-            </>
-          )}
-          <span fg={C.dim}>{" · "}</span>
-          <span fg={C.accent}>{"tab"}</span>
-          <span fg={C.dim}>{" switch view "}</span>
-          <span fg={C.dim}>{" · "}</span>
-          <span fg={C.accent}>{"q"}</span>
-          <span fg={C.dim}>{" quit"}</span>
-        </text>
-      </box>
     </box>
   )
 }
