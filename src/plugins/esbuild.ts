@@ -134,6 +134,7 @@ export const esbuildPlugin: BundlerPlugin = {
     return {
       target: target.name,
       bundler: "esbuild",
+      entry: target.entry,
       outputBytes,
       inputBytes,
       modules: modules.sort((a, b) => b.bytes - a.bytes),

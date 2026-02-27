@@ -120,6 +120,7 @@ export const wranglerPlugin: BundlerPlugin = {
     return {
       target: target.name,
       bundler: "wrangler",
+      entry: target.entry,
       outputBytes,
       inputBytes,
       modules: modules.sort((a, b) => b.bytes - a.bytes),

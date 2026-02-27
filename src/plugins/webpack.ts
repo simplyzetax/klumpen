@@ -98,7 +98,7 @@ export const webpackPlugin: BundlerPlugin = {
       }
     }
 
-    return parseWebpackStats(statsJson, target.name)
+    return { ...parseWebpackStats(statsJson, target.name), entry: target.entry }
   },
 }
 

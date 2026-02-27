@@ -5,19 +5,18 @@ import { TargetSelect } from "./ui/target-select.tsx"
 import { BuildProgress, type BuildState } from "./ui/build-progress.tsx"
 import { Summary } from "./ui/summary.tsx"
 import { PackageTable } from "./ui/package-table.tsx"
-import { Treemap } from "./ui/treemap.tsx"
 import { ModuleList } from "./ui/module-list.tsx"
+import { openAnalyzer } from "./open-analyzer.ts"
 import { ImportChain } from "./ui/import-chain.tsx"
 import type { DetectedTarget, BundleResult } from "./types.ts"
 import type { BundlerPlugin } from "./plugins/plugin.ts"
 
 type Phase = "select" | "building" | "results"
-type Tab = "summary" | "packages" | "treemap" | "modules" | "chains"
+type Tab = "summary" | "packages" | "modules" | "chains"
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "summary", label: "Summary" },
   { key: "packages", label: "Packages" },
-  { key: "treemap", label: "Treemap" },
   { key: "modules", label: "Modules" },
   { key: "chains", label: "Import Chains" },
 ]
@@ -106,12 +105,13 @@ export function App({ targets, plugins }: AppProps) {
     if (phase === "results") {
       switch (key.name) {
         case "tab": {
-          // When on the treemap tab, let the Treemap component handle tab via onTabSwitch
-          if (activeTab === "treemap") break
           const idx = TABS.findIndex((t) => t.key === activeTab)
           setActiveTab(TABS[(idx + 1) % TABS.length]!.key)
           break
         }
+        case "o":
+          if (currentResult) openAnalyzer(currentResult)
+          break
         case "[":
           setActiveResult((r) => Math.max(0, r - 1))
           break
@@ -126,6 +126,8 @@ export function App({ targets, plugins }: AppProps) {
     }
   })
 
+  const currentResult = results[activeResult]
+
   const handleSubmit = (selected: DetectedTarget[]) => {
     setBuilds(selected.map((t) => ({ target: t, status: "pending" as const })))
     setPhase("building")
@@ -134,8 +136,6 @@ export function App({ targets, plugins }: AppProps) {
   const handleQuit = () => {
     renderer.destroy()
   }
-
-  const currentResult = results[activeResult]
 
   return (
     <box flexDirection="column" paddingX={2} paddingY={1} width="100%">
@@ -156,6 +156,12 @@ export function App({ targets, plugins }: AppProps) {
           <box flexDirection="row" marginBottom={1}>
             <text fg={C.accent}>{currentResult.target}</text>
             <text fg={C.dim}>{` (${currentResult.bundler})`}</text>
+            {currentResult.entry && (
+              <>
+                <text fg={C.dim}>{" · "}</text>
+                <text fg={C.success}>{currentResult.entry}</text>
+              </>
+            )}
             {results.length > 1 && (
               <text fg={C.dim}>
                 {`  [${activeResult + 1}/${results.length}]`}
@@ -178,15 +184,6 @@ export function App({ targets, plugins }: AppProps) {
 
           {activeTab === "summary" && <Summary result={currentResult} />}
           {activeTab === "packages" && <PackageTable result={currentResult} />}
-          {activeTab === "treemap" && (
-            <Treemap
-              result={currentResult}
-              onTabSwitch={() => {
-                const idx = TABS.findIndex((t) => t.key === activeTab)
-                setActiveTab(TABS[(idx + 1) % TABS.length]!.key)
-              }}
-            />
-          )}
           {activeTab === "modules" && <ModuleList result={currentResult} />}
           {activeTab === "chains" && (
             <ImportChain result={currentResult} entryFile={currentResult.modules[0]?.path} />
@@ -196,6 +193,9 @@ export function App({ targets, plugins }: AppProps) {
             <text>
               <span fg={C.accent}>tab</span>
               <span fg={C.dim}> switch view </span>
+              <span fg={C.dim}> · </span>
+              <span fg={C.accent}>o</span>
+              <span fg={C.dim}> open treemap </span>
               {results.length > 1 && (
                 <>
                   <span fg={C.dim}> · </span>

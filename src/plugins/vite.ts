@@ -124,14 +124,14 @@ export default mergeConfig(typeof baseConfig === "function" ? baseConfig({ mode:
         const stats = JSON.parse(readFileSync(statsFile, "utf-8"))
         const result = parseChunkStats(stats, target.name, cwd)
         unlinkSync(statsFile)
-        return result
+        return { ...result, entry: target.entry }
       } catch {
         try { unlinkSync(statsFile) } catch {}
       }
     }
 
     // Fallback: scan dist/ output files (less useful but better than nothing)
-    return fallbackDistScan(cwd, target.name)
+    return { ...fallbackDistScan(cwd, target.name), entry: target.entry }
   },
 }
 

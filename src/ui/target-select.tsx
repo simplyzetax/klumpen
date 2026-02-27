@@ -1,5 +1,7 @@
 import { useKeyboard } from "@opentui/react"
 import { useState } from "react"
+import { existsSync } from "node:fs"
+import { resolve, dirname } from "node:path"
 import { C } from "./theme.ts"
 import type { DetectedTarget } from "../types.ts"
 
@@ -14,8 +16,44 @@ export function TargetSelect({ targets, onSubmit, onQuit }: TargetSelectProps) {
   const [selected, setSelected] = useState<Set<number>>(
     () => new Set(targets.map((_, i) => i)),
   )
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editValue, setEditValue] = useState("")
+  const [customEntries, setCustomEntries] = useState<Record<number, string>>({})
+  const [entryErrors, setEntryErrors] = useState<Record<number, boolean>>({})
 
   useKeyboard((key) => {
+    // Edit mode — consume all keys
+    if (editingIdx !== null) {
+      if (key.name === "escape") {
+        setEditingIdx(null)
+      } else if (key.name === "return" || key.name === "enter") {
+        const trimmed = editValue.trim()
+        setCustomEntries((prev) => {
+          const next = { ...prev }
+          if (trimmed) next[editingIdx] = trimmed
+          else delete next[editingIdx]
+          return next
+        })
+        if (trimmed) {
+          const target = targets[editingIdx]
+          const base = target ? dirname(target.configPath) : process.cwd()
+          const exists = existsSync(resolve(base, trimmed))
+          setEntryErrors((prev) => ({ ...prev, [editingIdx]: !exists }))
+        } else {
+          setEntryErrors((prev) => { const next = { ...prev }; delete next[editingIdx]; return next })
+        }
+        setEditingIdx(null)
+      } else if (key.name === "backspace") {
+        setEditValue((v) => v.slice(0, -1))
+      } else {
+        const ch = (key as unknown as { sequence?: string }).sequence
+        if (ch && ch.length === 1 && ch.charCodeAt(0) >= 32) {
+          setEditValue((v) => v + ch)
+        }
+      }
+      return
+    }
+
     switch (key.name) {
       case "up":
       case "k":
@@ -39,10 +77,21 @@ export function TargetSelect({ targets, onSubmit, onQuit }: TargetSelectProps) {
       case "n":
         setSelected(new Set())
         break
+      case "e": {
+        const current = targets[cursor]
+        setEditValue(customEntries[cursor] ?? current?.entry ?? "")
+        setEditingIdx(cursor)
+        break
+      }
       case "enter":
       case "return":
         if (selected.size > 0) {
-          const selectedTargets = targets.filter((_, i) => selected.has(i))
+          const selectedTargets = targets.reduce<DetectedTarget[]>((acc, t, i) => {
+            if (selected.has(i)) {
+              acc.push(customEntries[i] !== undefined ? { ...t, entry: customEntries[i] } : t)
+            }
+            return acc
+          }, [])
           onSubmit(selectedTargets)
         }
         break
@@ -67,6 +116,13 @@ export function TargetSelect({ targets, onSubmit, onQuit }: TargetSelectProps) {
         {targets.map((target, i) => {
           const on = selected.has(i)
           const active = i === cursor
+          const isEditing = editingIdx === i
+          const customEntry = customEntries[i]
+          const hasError = !isEditing && entryErrors[i]
+          const displayEntry = isEditing
+            ? editValue + "_"
+            : customEntry ?? target.entry
+          const entryColor = isEditing ? C.accent : hasError ? C.error : customEntry ? C.success : C.dim
           return (
             <box key={`${target.name}-${i}`} flexDirection="row">
               <text fg={active ? C.accent : "transparent"}>
@@ -77,8 +133,11 @@ export function TargetSelect({ targets, onSubmit, onQuit }: TargetSelectProps) {
                 {target.name.padEnd(20)}
               </text>
               <text fg={C.dim}>{target.bundler}</text>
-              {target.entry && (
-                <text fg={C.dim}>{" · " + target.entry}</text>
+              {displayEntry && (
+                <text fg={entryColor}>{" · " + displayEntry}</text>
+              )}
+              {hasError && (
+                <text fg={C.error}>{" ✗ not found"}</text>
               )}
             </box>
           )
@@ -89,6 +148,9 @@ export function TargetSelect({ targets, onSubmit, onQuit }: TargetSelectProps) {
         <text>
           <span fg={C.accent}>space</span>
           <span fg={C.dim}> toggle </span>
+          <span fg={C.dim}> · </span>
+          <span fg={C.accent}>e</span>
+          <span fg={C.dim}> edit entry </span>
           <span fg={C.dim}> · </span>
           <span fg={C.accent}>a</span>
           <span fg={C.dim}> all </span>

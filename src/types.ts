@@ -24,6 +24,7 @@ export interface ImportGraph {
 export interface BundleResult {
   target: string
   bundler: string
+  entry?: string
   outputBytes: number
   inputBytes: number
   modules: ModuleInfo[]
