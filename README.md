@@ -4,7 +4,7 @@ A universal bundle analyzer for JavaScript projects. Auto-detects your bundler, 
 
 ## Supported Bundlers
 
-esbuild &middot; Vite &middot; webpack &middot; Wrangler
+esbuild &middot; Rollup &middot; Vite &middot; webpack &middot; Wrangler
 
 ## Install
 

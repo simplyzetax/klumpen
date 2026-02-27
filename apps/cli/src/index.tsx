@@ -6,10 +6,11 @@ import { esbuildPlugin } from "./plugins/esbuild.ts"
 import { vitePlugin } from "./plugins/vite.ts"
 import { webpackPlugin } from "./plugins/webpack.ts"
 import { wranglerPlugin } from "./plugins/wrangler.ts"
+import { rollupPlugin } from "./plugins/rollup.ts"
 import type { BundlerPlugin } from "./plugins/plugin.ts"
 import { formatBytes, formatPct } from "@klumpen/shared"
 
-const plugins: BundlerPlugin[] = [wranglerPlugin, esbuildPlugin, vitePlugin, webpackPlugin]
+const plugins: BundlerPlugin[] = [wranglerPlugin, esbuildPlugin, vitePlugin, rollupPlugin, webpackPlugin]
 
 // CLI args
 const args = process.argv.slice(2)
