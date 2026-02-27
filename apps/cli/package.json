@@ -1,23 +1,32 @@
 {
-  "name": "@klumpen/cli",
-  "version": "0.1.0",
+  "name": "klumpen",
+  "version": "0.1.1",
+  "description": "Bundle size analyzer for esbuild, vite, webpack, and wrangler",
   "type": "module",
-  "bin": {
-    "klumpen": "./bin.ts"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/simplyzetax/klumpen",
+    "directory": "apps/cli"
   },
+  "keywords": ["bundle", "analyzer", "esbuild", "vite", "webpack", "wrangler", "treemap", "bundle-size"],
+  "bin": {
+    "klumpen": "./dist/bin.js"
+  },
+  "files": ["dist"],
   "scripts": {
     "dev": "bun run src/index.tsx",
-    "start": "bun run src/index.tsx"
+    "build": "bun run build.ts"
   },
   "dependencies": {
-    "@klumpen/shared": "workspace:*",
-    "@klumpen/analyzer": "workspace:*",
     "@opentui/core": "^0.1.83",
     "@opentui/react": "^0.1.83",
     "react": "^19.2.4"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@klumpen/analyzer": "workspace:*",
+    "@klumpen/shared": "workspace:*",
+    "@types/bun": "^1.3.9",
     "@types/react": "^19.2.14"
   }
 }

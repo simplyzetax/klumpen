@@ -25,6 +25,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # turborepo
 .turbo
 
+# generated at build time
+apps/cli/src/_analyzer-html.ts
+
 # caches
 .eslintcache
 .cache

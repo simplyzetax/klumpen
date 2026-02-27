@@ -13,9 +13,7 @@ interface TargetSelectProps {
 
 export function TargetSelect({ targets, onSubmit, onQuit }: TargetSelectProps) {
   const [cursor, setCursor] = useState(0)
-  const [selected, setSelected] = useState<Set<number>>(
-    () => new Set(targets.map((_, i) => i)),
-  )
+  const [selected, setSelected] = useState<Set<number>>(() => new Set())
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
   const [editValue, setEditValue] = useState("")
   const [customEntries, setCustomEntries] = useState<Record<number, string>>({})
