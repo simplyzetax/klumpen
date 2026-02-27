@@ -63,8 +63,10 @@ function fillColor(category: "npm" | "workspace" | "local"): string {
   return "#888888"                                  // lighter grey — readable on black bg
 }
 
-function labelColor(category: "npm" | "workspace" | "local"): string {
-  return category === "npm" ? "#000000" : "#000000"
+function labelColor(_category: "npm" | "workspace" | "local"): string {
+  // Labels replace the █ fill chars — they render on the terminal's dark background,
+  // NOT on the tile color. So all labels must be bright to stay readable.
+  return C.text // #e0e0e0
 }
 
 function renderCanvas(
