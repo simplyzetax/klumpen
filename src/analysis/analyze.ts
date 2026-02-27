@@ -19,16 +19,36 @@ export function groupModulesByPackage(modules: ModuleInfo[]): PackageGroup[] {
 }
 
 export function getPackageName(filePath: string): string {
+  // node_modules anywhere in path (handles pnpm/yarn symlinks, nested installs)
   if (filePath.includes("node_modules/")) {
     const parts = filePath.split("node_modules/").pop()!.split("/")
     return parts[0]!.startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0]!
   }
-  // Local files — group by top-level directory
-  const parts = filePath.split("/")
-  if (parts.length >= 2) {
-    return `${parts[0]}/${parts[1]}` + " (local)"
+
+  // Strip leading ./
+  const path = filePath.startsWith("./") ? filePath.slice(2) : filePath
+
+  // Paths going up from cwd — esbuild followed symlinks to workspace packages
+  if (path.startsWith("../")) {
+    const parts = path.split("/")
+    // Skip all leading ".." segments
+    let i = 0
+    while (i < parts.length && parts[i] === "..") i++
+    const real = parts.slice(i)
+    if (real.length === 0) return "(local)"
+
+    // ../../packages/name/... or ../../apps/name/... → workspace package name
+    const monorepoTopDirs = ["packages", "apps", "libs", "services", "workers", "modules"]
+    if (monorepoTopDirs.includes(real[0]!) && real.length >= 2) {
+      return `${real[1]} (workspace)`
+    }
+    // Anything else going up — use first real segment
+    return `${real[0]} (local)`
   }
-  return "local"
+
+  // Local source files — group by first path segment (e.g. "src")
+  const firstSegment = path.split("/")[0]!
+  return firstSegment ? `${firstSegment} (local)` : "(local)"
 }
 
 export function buildImportGraph(
