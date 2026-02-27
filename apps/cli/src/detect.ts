@@ -1,4 +1,4 @@
-import type { DetectedTarget } from "./types.ts"
+import type { DetectedTarget } from "@klumpen/shared"
 import type { BundlerPlugin } from "./plugins/plugin.ts"
 
 export function detectTargets(cwd: string, plugins: BundlerPlugin[]): DetectedTarget[] {

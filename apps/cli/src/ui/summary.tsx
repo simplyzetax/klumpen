@@ -1,6 +1,6 @@
 import { C } from "./theme.ts"
-import type { BundleResult } from "../types.ts"
-import { formatBytes } from "../analysis/analyze.ts"
+import type { BundleResult } from "@klumpen/shared"
+import { formatBytes } from "@klumpen/shared"
 
 interface SummaryProps {
   result: BundleResult

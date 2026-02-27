@@ -1,4 +1,4 @@
-import type { DetectedTarget, BundleResult } from "../types.ts"
+import type { DetectedTarget, BundleResult } from "@klumpen/shared"
 
 export interface BundlerPlugin {
   name: string

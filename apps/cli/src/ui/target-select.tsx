@@ -3,7 +3,7 @@ import { useState } from "react"
 import { existsSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { C } from "./theme.ts"
-import type { DetectedTarget } from "../types.ts"
+import type { DetectedTarget } from "@klumpen/shared"
 
 interface TargetSelectProps {
   targets: DetectedTarget[]

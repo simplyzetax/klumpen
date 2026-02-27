@@ -3,7 +3,7 @@ import { join, resolve, basename } from "path"
 import { exec } from "child_process"
 import { promisify } from "util"
 import type { BundlerPlugin } from "./plugin.ts"
-import type { DetectedTarget, BundleResult, ModuleInfo } from "../types.ts"
+import type { DetectedTarget, BundleResult, ModuleInfo } from "@klumpen/shared"
 import { groupModulesByPackage } from "../analysis/analyze.ts"
 
 const execAsync = promisify(exec)

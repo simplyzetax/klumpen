@@ -7,7 +7,7 @@ import { vitePlugin } from "./plugins/vite.ts"
 import { webpackPlugin } from "./plugins/webpack.ts"
 import { wranglerPlugin } from "./plugins/wrangler.ts"
 import type { BundlerPlugin } from "./plugins/plugin.ts"
-import { formatBytes, formatPct } from "./analysis/analyze.ts"
+import { formatBytes, formatPct } from "@klumpen/shared"
 
 const plugins: BundlerPlugin[] = [wranglerPlugin, esbuildPlugin, vitePlugin, webpackPlugin]
 

@@ -1,6 +1,6 @@
 import { C } from "./theme.ts"
-import type { DetectedTarget, BundleResult } from "../types.ts"
-import { formatBytes } from "../analysis/analyze.ts"
+import type { DetectedTarget, BundleResult } from "@klumpen/shared"
+import { formatBytes } from "@klumpen/shared"
 
 type BuildStatus = "pending" | "running" | "done" | "failed"
 

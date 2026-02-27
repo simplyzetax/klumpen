@@ -1,8 +1,8 @@
 import { useKeyboard } from "@opentui/react"
 import { useState } from "react"
 import { C } from "./theme.ts"
-import type { BundleResult, PackageGroup } from "../types.ts"
-import { formatBytes, formatPct } from "../analysis/analyze.ts"
+import type { BundleResult, PackageGroup } from "@klumpen/shared"
+import { formatBytes, formatPct } from "@klumpen/shared"
 
 interface PackageTableProps {
   result: BundleResult

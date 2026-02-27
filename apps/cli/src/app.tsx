@@ -8,7 +8,7 @@ import { PackageTable } from "./ui/package-table.tsx"
 import { ModuleList } from "./ui/module-list.tsx"
 import { openAnalyzer } from "./open-analyzer.ts"
 import { ImportChain } from "./ui/import-chain.tsx"
-import type { DetectedTarget, BundleResult } from "./types.ts"
+import type { DetectedTarget, BundleResult } from "@klumpen/shared"
 import type { BundlerPlugin } from "./plugins/plugin.ts"
 
 type Phase = "select" | "building" | "results"
