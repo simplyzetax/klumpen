@@ -9,7 +9,7 @@ import { groupModulesByPackage } from "../analysis/analyze.ts"
 const execAsync = promisify(exec)
 const BUILD_TIMEOUT = 120_000 // vite builds can be slower
 
-export const vitePlugin: BundlerPlugin = {
+export const vitePlugin = {
   name: "vite",
 
   detect(cwd: string): DetectedTarget[] {
@@ -133,7 +133,7 @@ export default mergeConfig(typeof baseConfig === "function" ? baseConfig({ mode:
     // Fallback: scan dist/ output files (less useful but better than nothing)
     return { ...fallbackDistScan(cwd, target.name), entry: target.entry }
   },
-}
+} satisfies BundlerPlugin
 
 function findViteBin(cwd: string): string {
   const candidates = [

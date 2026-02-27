@@ -11,7 +11,7 @@ const BUILD_TIMEOUT = 60_000
 
 const WRANGLER_CONFIGS = ["wrangler.jsonc", "wrangler.json", "wrangler.toml"]
 
-export const wranglerPlugin: BundlerPlugin = {
+export const wranglerPlugin = {
   name: "wrangler",
 
   detect(cwd: string): DetectedTarget[] {
@@ -128,7 +128,7 @@ export const wranglerPlugin: BundlerPlugin = {
       importGraph,
     }
   },
-}
+} satisfies BundlerPlugin
 
 function parseWranglerEntry(configPath: string, configName: string): string | null {
   const content = readFileSync(configPath, "utf-8")

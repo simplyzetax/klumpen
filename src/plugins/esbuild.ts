@@ -9,7 +9,7 @@ import { groupModulesByPackage, buildImportGraph } from "../analysis/analyze.ts"
 const execAsync = promisify(exec)
 const BUILD_TIMEOUT = 60_000
 
-export const esbuildPlugin: BundlerPlugin = {
+export const esbuildPlugin = {
   name: "esbuild",
 
   detect(cwd: string): DetectedTarget[] {
@@ -142,7 +142,7 @@ export const esbuildPlugin: BundlerPlugin = {
       importGraph,
     }
   },
-}
+} satisfies BundlerPlugin
 
 function findEsbuildBin(cwd: string): string {
   const candidates = [

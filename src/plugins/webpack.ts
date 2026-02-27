@@ -9,7 +9,7 @@ import { groupModulesByPackage } from "../analysis/analyze.ts"
 const execAsync = promisify(exec)
 const BUILD_TIMEOUT = 120_000
 
-export const webpackPlugin: BundlerPlugin = {
+export const webpackPlugin = {
   name: "webpack",
 
   detect(cwd: string): DetectedTarget[] {
@@ -100,7 +100,7 @@ export const webpackPlugin: BundlerPlugin = {
 
     return { ...parseWebpackStats(statsJson, target.name), entry: target.entry }
   },
-}
+} satisfies BundlerPlugin
 
 function findWebpackBin(cwd: string): string {
   const candidates = [
