@@ -38,6 +38,7 @@ export function App({ targets, plugins }: AppProps) {
 
     const run = async () => {
       const selectedTargets = builds.map((b) => b.target)
+      let successCount = 0
 
       for (let i = 0; i < selectedTargets.length; i++) {
         const target = selectedTargets[i]!
@@ -47,7 +48,7 @@ export function App({ targets, plugins }: AppProps) {
         )
 
         // Yield to let React render the "running" state before the build starts
-        await new Promise((r) => setTimeout(r, 10))
+        await new Promise((r) => setTimeout(r, 50))
 
         const plugin = plugins.find((p) => p.name === target.bundler)
         if (!plugin) {
@@ -61,6 +62,7 @@ export function App({ targets, plugins }: AppProps) {
 
         try {
           const result = await plugin.analyze(target)
+          successCount++
           setResults((prev) => [...prev, result])
           setBuilds((prev) =>
             prev.map((b, j) =>
@@ -82,7 +84,11 @@ export function App({ targets, plugins }: AppProps) {
         }
       }
 
-      setPhase("results")
+      // Only go to results if at least one build succeeded.
+      // If all failed, stay in "building" so user can read error messages (press q to quit).
+      if (successCount > 0) {
+        setPhase("results")
+      }
     }
 
     run()
